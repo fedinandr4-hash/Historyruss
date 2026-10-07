@@ -1,8 +1,8 @@
-import textbookData from './textbook.json';
+import { textbookData } from './textbook';
 import { Chapter, Paragraph } from './types';
 
-// Преобразование JSON в типизированные данные
-export const chapters: Chapter[] = textbookData as Chapter[];
+// Экспорт типизированных данных
+export const chapters: Chapter[] = textbookData;
 
 // Получение всех параграфов из всех глав
 export const getAllParagraphs = (): Paragraph[] => {
