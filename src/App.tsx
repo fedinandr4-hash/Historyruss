@@ -8,7 +8,7 @@ function TextbookSelector({ onSelect }: { onSelect: (id: string) => void }) {
     <div className="textbook-selector">
       <div className="selector-header">
         <div className="header-ornament">✦ ✦ ✦</div>
-        <h1>Исторический Таймлайн</h1>
+        <h1>Историческая Библиотека</h1>
         <p className="subtitle">Выберите учебник для изучения</p>
         <div className="header-ornament">✦ ✦ ✦</div>
       </div>
@@ -295,7 +295,7 @@ function App() {
 
       {/* Подвал */}
       <footer className="app-footer">
-        <p>Исторический Таймлайн • Учебники Мединского В.Р., Торкунова А.В. • 10 класс</p>
+        <p>Историческая Библиотека • Учебники Мединского В.Р., Торкунова А.В. • 10 класс</p>
         <p>Интерактивное веб-приложение для изучения истории</p>
       </footer>
     </div>
