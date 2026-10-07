@@ -1,6 +1,39 @@
 import { useState } from 'react';
-import { chapters, searchParagraphs, getParagraphsByChapter } from './data';
-import { Chapter, Paragraph } from './data/types';
+import { allTextbooks, searchParagraphs, getTextbookById } from './data';
+import { Textbook, Chapter, Paragraph } from './data/types';
+
+// Экран выбора учебника
+function TextbookSelector({ onSelect }: { onSelect: (id: string) => void }) {
+  return (
+    <div className="textbook-selector">
+      <div className="selector-header">
+        <div className="header-ornament">✦ ✦ ✦</div>
+        <h1>Исторический Таймлайн</h1>
+        <p className="subtitle">Выберите учебник для изучения</p>
+        <div className="header-ornament">✦ ✦ ✦</div>
+      </div>
+      
+      <div className="textbook-cards">
+        {allTextbooks.map(textbook => (
+          <div 
+            key={textbook.id} 
+            className="textbook-card"
+            onClick={() => onSelect(textbook.id)}
+          >
+            <div className="textbook-icon">📚</div>
+            <h2 className="textbook-title">{textbook.title}</h2>
+            <h3 className="textbook-subtitle">{textbook.subtitle}</h3>
+            <p className="textbook-authors">{textbook.authors}</p>
+            <p className="textbook-period">{textbook.period}</p>
+            <div className="textbook-chapters-count">
+              {textbook.chapters.length} глав • {textbook.chapters.reduce((acc, ch) => acc + ch.paragraphs.length, 0)} параграфов
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Компонент карточки параграфа
 function ParagraphCard({ paragraph, onClick }: { paragraph: Paragraph; onClick: () => void }) {
@@ -107,15 +140,39 @@ function ChapterSection({ chapter, onParagraphClick }: { chapter: Chapter; onPar
   );
 }
 
+// Компонент заключения учебника
+function TextbookConclusion({ textbook, onClose }: { textbook: Textbook; onClose: () => void }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content conclusion-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose}>✕</button>
+        
+        <div className="modal-header">
+          <div className="modal-number">Заключение</div>
+          <h2 className="modal-title">{textbook.title}. {textbook.subtitle}</h2>
+        </div>
+
+        <div className="modal-section">
+          <p className="conclusion-text">{textbook.conclusion}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Главный компонент приложения
 function App() {
+  const [selectedTextbookId, setSelectedTextbookId] = useState<string | null>(null);
   const [selectedParagraph, setSelectedParagraph] = useState<Paragraph | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Paragraph[] | null>(null);
+  const [showConclusion, setShowConclusion] = useState(false);
+
+  const selectedTextbook = selectedTextbookId ? getTextbookById(selectedTextbookId) : null;
 
   const handleSearch = () => {
-    if (searchQuery.trim()) {
-      const results = searchParagraphs(searchQuery);
+    if (searchQuery.trim() && selectedTextbookId) {
+      const results = searchParagraphs(selectedTextbookId, searchQuery);
       setSearchResults(results);
     } else {
       setSearchResults(null);
@@ -127,16 +184,38 @@ function App() {
     setSearchResults(null);
   };
 
+  const handleBackToSelector = () => {
+    setSelectedTextbookId(null);
+    setSearchQuery('');
+    setSearchResults(null);
+    setSelectedParagraph(null);
+  };
+
+  // Если учебник не выбран — показываем экран выбора
+  if (!selectedTextbookId || !selectedTextbook) {
+    return <TextbookSelector onSelect={setSelectedTextbookId} />;
+  }
+
   return (
     <div className="app">
       {/* Заголовок */}
       <header className="app-header">
         <div className="header-ornament">✦ ✦ ✦</div>
-        <h1>Исторический Таймлайн</h1>
-        <h2>Россия. 1914—1945 годы</h2>
-        <p className="subtitle">По учебнику Мединского / Торкунова • 10 класс</p>
+        <h1>{selectedTextbook.title}</h1>
+        <h2>{selectedTextbook.subtitle}</h2>
+        <p className="subtitle">{selectedTextbook.authors} • {selectedTextbook.period}</p>
         <div className="header-ornament">✦ ✦ ✦</div>
       </header>
+
+      {/* Панель навигации */}
+      <div className="nav-panel">
+        <button className="btn-back" onClick={handleBackToSelector}>
+          ← Выбрать другой учебник
+        </button>
+        <button className="btn-conclusion" onClick={() => setShowConclusion(true)}>
+          📖 Заключение
+        </button>
+      </div>
 
       {/* Панель поиска */}
       <div className="search-panel">
@@ -187,7 +266,7 @@ function App() {
         ) : (
           // Режим просмотра глав
           <div className="chapters-list">
-            {chapters.map(chapter => (
+            {selectedTextbook.chapters.map(chapter => (
               <ChapterSection
                 key={chapter.id}
                 chapter={chapter}
@@ -206,10 +285,18 @@ function App() {
         />
       )}
 
+      {/* Модальное окно заключения */}
+      {showConclusion && selectedTextbook && (
+        <TextbookConclusion
+          textbook={selectedTextbook}
+          onClose={() => setShowConclusion(false)}
+        />
+      )}
+
       {/* Подвал */}
       <footer className="app-footer">
-        <p>Исторический Таймлайн • Учебник «История России. 1914—1945 годы» • 10 класс</p>
-        <p>Авторы: Мединский В.Р., Торкунов А.В. • Интерактивное веб-приложение</p>
+        <p>Исторический Таймлайн • Учебники Мединского В.Р., Торкунова А.В. • 10 класс</p>
+        <p>Интерактивное веб-приложение для изучения истории</p>
       </footer>
     </div>
   );

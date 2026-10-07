@@ -22,3 +22,13 @@ export interface Chapter {
   period: string;
   paragraphs: Paragraph[];
 }
+
+export interface Textbook {
+  id: string;
+  title: string;
+  subtitle: string;
+  authors: string;
+  period: string;
+  conclusion: string;
+  chapters: Chapter[];
+}
