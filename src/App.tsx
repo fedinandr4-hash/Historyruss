@@ -1,193 +1,130 @@
-import { useState, useEffect, useRef } from 'react';
-import { events, HistoricalEvent } from './data/events';
+import { useState } from 'react';
+import { chapters, searchParagraphs, getParagraphsByChapter } from './data';
+import { Chapter, Paragraph } from './data/types';
 
-// Компонент карточки события
-function EventCard({ event, onSelect, isSelected }: { event: HistoricalEvent; onSelect: (e: HistoricalEvent) => void; isSelected: boolean }) {
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
-      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
-    return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()} г.`;
-  };
-
-  const chapterNames: Record<string, string> = {
-    'I': 'Россия в Первой мировой войне',
-    'II': 'Россия в 1918—1941 годах',
-    'III': 'Великая Отечественная война'
-  };
-
+// Компонент карточки параграфа
+function ParagraphCard({ paragraph, onClick }: { paragraph: Paragraph; onClick: () => void }) {
   return (
-    <div
-      className={`event-card ${isSelected ? 'selected' : ''}`}
-      onClick={() => onSelect(event)}
-    >
-      <div className="event-date">{formatDate(event.date)}</div>
-      <h3 className="event-title">{event.title}</h3>
-      <p className="event-description">{event.description}</p>
-      <div className="event-meta">
-        <span className="event-location">📍 {event.location}</span>
-        {event.chapter && <span className="event-chapter">📖 Глава {event.chapter}</span>}
-        {event.paragraph && <span className="event-paragraph">{event.paragraph}</span>}
+    <div className="paragraph-card" onClick={onClick}>
+      <div className="paragraph-number">{paragraph.number}</div>
+      <h3 className="paragraph-title">{paragraph.title}</h3>
+      <p className="paragraph-summary">{paragraph.summary}</p>
+      <div className="paragraph-meta">
+        <span className="meta-dates">📅 {paragraph.keyDates.length} дат</span>
+        <span className="meta-figures">👤 {paragraph.keyFigures.length} персон</span>
+        <span className="meta-terms">📖 {paragraph.keyTerms.length} терминов</span>
       </div>
-      {event.chapter && (
-        <div className="chapter-name">{chapterNames[event.chapter]}</div>
-      )}
     </div>
   );
 }
 
-// Компонент чата
-function ChatPanel({ event, onClose }: { event: HistoricalEvent; onClose: () => void }) {
-  const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+// Модальное окно с детальной информацией о параграфе
+function ParagraphModal({ paragraph, onClose }: { paragraph: Paragraph; onClose: () => void }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose}>✕</button>
+        
+        <div className="modal-header">
+          <div className="modal-number">{paragraph.number}</div>
+          <h2 className="modal-title">{paragraph.title}</h2>
+        </div>
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+        <div className="modal-section">
+          <h3>📜 Краткое описание</h3>
+          <p className="modal-summary">{paragraph.summary}</p>
+        </div>
 
-  const sendMessage = async () => {
-    if (!question.trim()) return;
+        <div className="modal-section">
+          <h3>📅 Ключевые даты</h3>
+          <ul className="modal-list">
+            {paragraph.keyDates.map((date, idx) => (
+              <li key={idx}>
+                <strong>{date.date}</strong> — {date.text}
+              </li>
+            ))}
+          </ul>
+        </div>
 
-    const context = `${event.title}. ${event.description}`;
-    const userMessage = question;
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setQuestion('');
-    setIsLoading(true);
+        <div className="modal-section">
+          <h3>👤 Ключевые исторические деятели</h3>
+          <div className="modal-tags">
+            {paragraph.keyFigures.map((figure, idx) => (
+              <span key={idx} className="tag figure-tag">{figure}</span>
+            ))}
+          </div>
+        </div>
 
-    try {
-      const response = await fetch('http://localhost:11434/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'qwen3-coder:30b',
-          prompt: `Контекст: ${context}\n\nВопрос: ${userMessage}\n\nОтветь на русском языке, опираясь на контекст.`,
-          stream: false
-        })
-      });
+        <div className="modal-section">
+          <h3>📖 Ключевые термины и понятия</h3>
+          <div className="modal-tags">
+            {paragraph.keyTerms.map((term, idx) => (
+              <span key={idx} className="tag term-tag">{term}</span>
+            ))}
+          </div>
+        </div>
 
-      if (!response.ok) throw new Error('Ошибка сети');
-      const data = await response.json();
-      const answer = data.response || 'Нет ответа';
-      setMessages(prev => [...prev, { role: 'assistant', content: answer }]);
-    } catch {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: '⚠️ Не удалось подключиться к локальному ИИ (Ollama). Убедитесь, что Ollama запущена на localhost:11434 и модель qwen3-coder:30b установлена.\n\nДля запуска: ollama run qwen3-coder:30b'
-      }]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        <div className="modal-section">
+          <h3>✨ Основные положения</h3>
+          <ul className="modal-list main-points">
+            {paragraph.mainPoints.map((point, idx) => (
+              <li key={idx}>{point}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+// Компонент главы с раскрывающимися параграфами
+function ChapterSection({ chapter, onParagraphClick }: { chapter: Chapter; onParagraphClick: (p: Paragraph) => void }) {
+  const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <div className="chat-panel">
-      <div className="chat-header">
-        <h3>💬 Вопрос по событию</h3>
-        <button className="chat-close" onClick={onClose}>✕</button>
+    <div className={`chapter-section ${isExpanded ? 'expanded' : ''}`}>
+      <div className="chapter-header" onClick={() => setIsExpanded(!isExpanded)}>
+        <div className="chapter-info">
+          <div className="chapter-number">Глава {chapter.number}</div>
+          <h2 className="chapter-title">{chapter.title}</h2>
+          <div className="chapter-period">{chapter.period}</div>
+        </div>
+        <div className="chapter-toggle">{isExpanded ? '▼' : '▶'}</div>
       </div>
-      <div className="chat-context">
-        <strong>{event.title}</strong>
-      </div>
-      <div className="chat-messages">
-        {messages.length === 0 && (
-          <div className="chat-empty">
-            Задайте вопрос по данному событию. Например: «Какие были последствия?» или «Кто участвовал?»
-          </div>
-        )}
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`chat-message ${msg.role}`}>
-            <div className="message-role">{msg.role === 'user' ? '🧑 Вы' : '🤖 ИИ'}</div>
-            <div className="message-content">{msg.content}</div>
-          </div>
-        ))}
-        {isLoading && (
-          <div className="chat-message assistant loading">
-            <div className="message-role">🤖 ИИ</div>
-            <div className="message-content">
-              <span className="typing-indicator">
-                <span></span><span></span><span></span>
-              </span>
-              Генерация ответа...
-            </div>
-          </div>
-        )}
-        <div ref={chatEndRef} />
-      </div>
-      <div className="chat-input-area">
-        <textarea
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Введите вопрос..."
-          rows={2}
-        />
-        <button onClick={sendMessage} disabled={isLoading || !question.trim()}>
-          {isLoading ? '⏳' : '📤'} Отправить
-        </button>
-      </div>
+      
+      {isExpanded && (
+        <div className="paragraphs-container">
+          {chapter.paragraphs.map(paragraph => (
+            <ParagraphCard
+              key={paragraph.id}
+              paragraph={paragraph}
+              onClick={() => onParagraphClick(paragraph)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 // Главный компонент приложения
 function App() {
-  const [filteredEvents, setFilteredEvents] = useState<HistoricalEvent[]>(events);
+  const [selectedParagraph, setSelectedParagraph] = useState<Paragraph | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [yearFilter, setYearFilter] = useState('');
-  const [selectedEvent, setSelectedEvent] = useState<HistoricalEvent | null>(null);
-  const [activeChapter, setActiveChapter] = useState<string>('all');
-
-  // Фильтрация событий
-  useEffect(() => {
-    let result = [...events];
-
-    // Фильтр по главе
-    if (activeChapter !== 'all') {
-      result = result.filter(e => e.chapter === activeChapter);
-    }
-
-    // Фильтр по поисковому запросу
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(e =>
-        e.title.toLowerCase().includes(q) ||
-        e.description.toLowerCase().includes(q)
-      );
-    }
-
-    // Фильтр по году
-    if (yearFilter.trim()) {
-      result = result.filter(e => e.date.startsWith(yearFilter.trim()));
-    }
-
-    setFilteredEvents(result);
-  }, [searchQuery, yearFilter, activeChapter]);
+  const [searchResults, setSearchResults] = useState<Paragraph[] | null>(null);
 
   const handleSearch = () => {
-    // Фильтрация уже происходит в useEffect
+    if (searchQuery.trim()) {
+      const results = searchParagraphs(searchQuery);
+      setSearchResults(results);
+    } else {
+      setSearchResults(null);
+    }
   };
 
   const handleReset = () => {
     setSearchQuery('');
-    setYearFilter('');
-    setActiveChapter('all');
-    setSelectedEvent(null);
-  };
-
-  const chapterNames: Record<string, string> = {
-    'all': 'Все главы',
-    'I': 'Глава I: Первая мировая',
-    'II': 'Глава II: 1918—1941',
-    'III': 'Глава III: ВОВ 1941—1945'
+    setSearchResults(null);
   };
 
   return (
@@ -201,76 +138,72 @@ function App() {
         <div className="header-ornament">✦ ✦ ✦</div>
       </header>
 
-      {/* Панель поиска и фильтрации */}
+      {/* Панель поиска */}
       <div className="search-panel">
         <div className="search-row">
           <div className="search-input-group">
             <input
               type="text"
-              placeholder="🔍 Поиск по названию или описанию..."
+              placeholder="🔍 Поиск по параграфам, терминам, персоналиям..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             />
           </div>
-          <div className="year-input-group">
-            <input
-              type="text"
-              placeholder="Год (напр. 1917)"
-              value={yearFilter}
-              onChange={(e) => setYearFilter(e.target.value)}
-              maxLength={4}
-            />
-          </div>
-          <button className="btn-search" onClick={handleSearch}>Фильтровать</button>
+          <button className="btn-search" onClick={handleSearch}>Найти</button>
           <button className="btn-reset" onClick={handleReset}>Сбросить</button>
         </div>
 
-        {/* Фильтр по главам */}
-        <div className="chapter-filters">
-          {Object.entries(chapterNames).map(([key, name]) => (
-            <button
-              key={key}
-              className={`chapter-btn ${activeChapter === key ? 'active' : ''}`}
-              onClick={() => setActiveChapter(key)}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-
-        <div className="results-count">
-          Найдено событий: {filteredEvents.length} из {events.length}
-        </div>
+        {searchResults && (
+          <div className="search-results-info">
+            Найдено параграфов: {searchResults.length}
+          </div>
+        )}
       </div>
 
-      {/* Таймлайн */}
-      <main className="timeline-container">
-        <div className="timeline">
-          <div className="timeline-line"></div>
-          {filteredEvents.map((event, index) => (
-            <div key={event.id} className={`timeline-item ${index % 2 === 0 ? 'left' : 'right'}`}>
-              <div className="timeline-dot"></div>
-              <EventCard
-                event={event}
-                onSelect={setSelectedEvent}
-                isSelected={selectedEvent?.id === event.id}
+      {/* Основной контент */}
+      <main className="content-container">
+        {searchResults ? (
+          // Режим поиска
+          <div className="search-results">
+            <h2 className="results-title">Результаты поиска</h2>
+            {searchResults.length === 0 ? (
+              <div className="no-results">
+                <p>📜 Параграфы не найдены</p>
+                <p>Попробуйте изменить поисковый запрос</p>
+              </div>
+            ) : (
+              <div className="paragraphs-grid">
+                {searchResults.map(paragraph => (
+                  <ParagraphCard
+                    key={paragraph.id}
+                    paragraph={paragraph}
+                    onClick={() => setSelectedParagraph(paragraph)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          // Режим просмотра глав
+          <div className="chapters-list">
+            {chapters.map(chapter => (
+              <ChapterSection
+                key={chapter.id}
+                chapter={chapter}
+                onParagraphClick={setSelectedParagraph}
               />
-            </div>
-          ))}
-        </div>
-
-        {filteredEvents.length === 0 && (
-          <div className="no-results">
-            <p>📜 События не найдены</p>
-            <p>Попробуйте изменить параметры поиска</p>
+            ))}
           </div>
         )}
       </main>
 
-      {/* Панель чата */}
-      {selectedEvent && (
-        <ChatPanel event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      {/* Модальное окно с деталями параграфа */}
+      {selectedParagraph && (
+        <ParagraphModal
+          paragraph={selectedParagraph}
+          onClose={() => setSelectedParagraph(null)}
+        />
       )}
 
       {/* Подвал */}
